@@ -131,6 +131,12 @@ hdmi_mode=16
 dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up
 ```
 
+```bash
+#/boot/firmware/cmdline.txt
+... rootwait cma=320M cfg ...
+
+```
+
 ---
 
 ## 📜 8. ライセンス
