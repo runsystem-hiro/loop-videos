@@ -2,12 +2,12 @@
 
 Raspberry Pi 4B (64‑bit **Bookworm/Bullseye**) を HDMI 出力専用サイネージ端末として運用する最小構成です。動画ファイルをフォルダに置いて再起動するだけで無限ループ再生します。
 
-| 項目             | 採用技術                                         |
-| -------------- | -------------------------------------------- |
-| 🎬 **プレーヤー**   | `mpv`（DRM PRIME HW デコード・自動アスペクト保持）           |
-| 🐍 **制御スクリプト** | `loop_videos.py`（Python 3 標準モジュールのみ）         |
-| ⚙️ **設定**      | `.env` 1 ファイルに統一                             |
-| 🔄 **自動起動**    | `systemd` サービス `loopplayer.service`（tty1 専有） |
+| 項目                  | 採用技術                                             |
+| --------------------- | ---------------------------------------------------- |
+| 🎬 **プレーヤー**     | `mpv`（DRM PRIME HW デコード・自動アスペクト保持）   |
+| 🐍 **制御スクリプト** | `loop_videos.py`（Python 3 標準モジュールのみ）      |
+| ⚙️ **設定**           | `.env` 1 ファイルに統一                              |
+| 🔄 **自動起動**       | `systemd` サービス `loopplayer.service`（tty1 専有） |
 
 ---
 
@@ -15,13 +15,12 @@ Raspberry Pi 4B (64‑bit **Bookworm/Bullseye**) を HDMI 出力専用サイネ
 
 Raspberry Pi のコンソール (tty1) を **専用でプレーヤーに割り当てる** ことで、デジタルサイネージとして次の利点が得られます。
 
-* **不要な文字列を完全排除**：login プロンプトやカーネルメッセージが映像に重ならない。
-* **シームレスなブート体験**：電源投入後すぐに動画が表示され、黒→文字→映像のチラつきがない。
-* **誤操作に強い**：ESC や Ctrl‑C が tty1 以外へ届かず、現場での不意の停止を防止。
-* **スクリーンセーバ無効**：`setterm` を ExecStartPre で実行し DPMS / カーソル / ブランクを無効化。
-* **単一インスタンス保証**：systemd が tty1 で 1 プロセスを管理し、多重起動やゾンビを防ぐ。
-* **保守性向上**：`journalctl -u loopplayer` でログ一元化、`sudo systemctl` だけで再起動・停止が可能。
-
+- **不要な文字列を完全排除**：login プロンプトやカーネルメッセージが映像に重ならない。
+- **シームレスなブート体験**：電源投入後すぐに動画が表示され、黒 → 文字 → 映像のチラつきがない。
+- **誤操作に強い**：ESC や Ctrl‑C が tty1 以外へ届かず、現場での不意の停止を防止。
+- **スクリーンセーバ無効**：`setterm` を ExecStartPre で実行し DPMS / カーソル / ブランクを無効化。
+- **単一インスタンス保証**：systemd が tty1 で 1  プロセスを管理し、多重起動やゾンビを防ぐ。
+- **保守性向上**：`journalctl -u loopplayer` でログ一元化、`sudo systemctl` だけで再起動・停止が可能。
 
 ---
 
@@ -76,13 +75,13 @@ LOG_LEVEL=INFO
 
 ## 🛠️ 5. よく使う運用コマンド
 
-| 目的             | コマンド                                          |
-| -------------- | --------------------------------------------- |
+| 目的                  | コマンド                                      |
+| --------------------- | --------------------------------------------- |
 | 🔄 **サービス再起動** | `sudo systemctl restart loopplayer`           |
-| ⏹️ **サービス停止**  | `sudo systemctl stop loopplayer`              |
-| ▶️ **サービス開始**  | `sudo systemctl start loopplayer`             |
-| 🔍 **状態確認**    | `sudo systemctl status loopplayer --no-pager` |
-| 📜 **直近ログ**    | `journalctl -u loopplayer -n 50 --no-pager`   |
+| ⏹️ **サービス停止**   | `sudo systemctl stop loopplayer`              |
+| ▶️ **サービス開始**   | `sudo systemctl start loopplayer`             |
+| 🔍 **状態確認**       | `sudo systemctl status loopplayer --no-pager` |
+| 📜 **直近ログ**       | `journalctl -u loopplayer -n 50 --no-pager`   |
 
 ---
 
@@ -108,11 +107,29 @@ sudo systemctl enable --now loopplayer.service
 
 ## 🚑 7. トラブルシューティング
 
-| 症状                 | 対処                                                |
-| ------------------ | ------------------------------------------------- |
-| 🖤 **黒画面・音声のみ**    | `/boot/config.txt` に `gpu_mem=256` を追加し再起動        |
-| 🔄 **login 文字が被る** | `sudo systemctl disable --now getty@tty1.service` |
-| 🔉 **PipeWire 警告** | 無害。消す場合 `PLAYER_OPTIONS+=--ao=alsa`               |
+| 症状                    | 対処                                               |
+| ----------------------- | -------------------------------------------------- |
+| 🖤 **黒画面・音声のみ** | `/boot/config.txt` に `gpu_mem=256` を追加し再起動 |
+| 🔄 **login 文字が被る** | `sudo systemctl disable --now getty@tty1.service`  |
+| 🔉 **PipeWire 警告**    | 無害。消す場合 `PLAYER_OPTIONS+=--ao=alsa`         |
+
+## 例：最小実用セット
+
+```bash
+#/boot/firmware/config.txt
+
+arm_64bit=1
+disable_overscan=1
+dtoverlay=vc4-kms-v3d
+gpu_mem=512
+cma=320M
+hdmi_force_hotplug=1
+hdmi_group=1
+hdmi_mode=16
+
+# ==== physical shutdown button ====
+dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up
+```
 
 ---
 

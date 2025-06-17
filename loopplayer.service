@@ -5,6 +5,7 @@ After=sound.target
 
 [Service]
 User=pi
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 TTYPath=/dev/tty1
 StandardInput=tty
 StandardOutput=tty
