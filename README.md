@@ -213,19 +213,13 @@ ps -eo pid,comm,%mem --sort=-%mem | head
 
 
 # ---------------------------------------------
-# ⚙️ Overlay Filesystem 関連
+# ⚙️ 音声設定
 # ---------------------------------------------
 
-# raspi-configを起動してOverlay FSを有効/無効に設定
-sudo raspi-config
-# → Performance Options → Overlay Filesystem
+# /etc/asound.conf
+defaults.pcm.card 0
+defaults.ctl.card 0
 
-# 現在のマウント状態を確認
-mount | grep overlay
-
-# 再起動
-sudo reboot
-```
 
 ---
 
@@ -234,3 +228,4 @@ sudo reboot
 MIT License © 2025 hiro (runsystem)
 
 ---
+```
