@@ -124,6 +124,7 @@ cma=320M
 hdmi_force_hotplug=1
 hdmi_group=1
 hdmi_mode=16
+audio_output=1
 
 # ==== physical shutdown button ====
 dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up
