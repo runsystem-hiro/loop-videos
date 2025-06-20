@@ -1,79 +1,35 @@
 #!/usr/bin/env python3
-
-from __future__ import annotations
-
-import glob
-import logging
+import os
 import subprocess
+import glob
 import sys
-import time
-from pathlib import Path
-from subprocess import DEVNULL
-from typing import Final
 
-ENV_FILE: Final = Path(__file__).with_name(".env")
+# 動画ディレクトリの絶対パス
+VIDEO_DIR = "/home/pi/loop-videos/assets"
 
+# .mp4 ファイルを取得（ソート付きで順序保証）
+video_files = sorted(glob.glob(os.path.join(VIDEO_DIR, "*.mp4")))
 
-def load_env(path: Path) -> dict[str, str]:
-    if not path.exists():
-        sys.exit(f".env not found: {path}")
+# ファイルが存在しない場合は終了
+if not video_files:
+    print("⚠ No video files found in:", VIDEO_DIR)
+    sys.exit(1)
 
-    env: dict[str, str] = {}
-    for line in path.read_text().splitlines():
-        line = line.split("#", 1)[0].strip()
-        if "=" in line:
-            k, v = line.split("=", 1)
-            env[k.strip()] = v.strip()
-    return env
+# VLC のオプション
+VLC_COMMAND = [
+    "cvlc",
+    "--fullscreen",                # 全画面再生
+    "--no-video-title-show",       # タイトル非表示
+    "--video-on-top",              # 他ウィンドウより前面に表示
+    "--playlist-autostart",        # プレイリスト自動開始
+    "--loop",           # 最後の動画再生後、最初に戻ってループ
+    "--quiet",                     # コンソール出力を抑制
+    "--aout", "alsa"               # 音声出力をALSA（3.5mmジャック）
+] + video_files                    # 動画ファイル群を引数として渡す
 
-
-cfg = load_env(ENV_FILE)
-
-VIDEO_DIR: Final = Path(cfg.get("VIDEO_DIR", "/home/pi/loop-videos/assets"))
-SUPPORTED_FORMATS: Final = [p.strip() for p in cfg.get(
-    "SUPPORTED_FORMATS", "*.mp4").split(",")]
-PLAYER: Final = cfg.get("PLAYER", "mpv")
-PLAYER_OPTIONS: Final = cfg.get(
-    "PLAYER_OPTIONS", "--fs --loop-playlist --no-border --really-quiet --ao=alsa",).split()
-LOGIN_WAIT_TIME: Final = int(cfg.get("LOGIN_WAIT_TIME", "1").strip() or 0)
-LOG_LEVEL: Final = cfg.get("LOG_LEVEL", "INFO").upper()
-
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format="%(asctime)s %(levelname)s: %(message)s",
-)
-
-
-def collect_videos() -> list[str]:
-    files: list[str] = []
-    for pattern in SUPPORTED_FORMATS:
-        files.extend(glob.glob(str(VIDEO_DIR / pattern)))
-    return sorted(files)
-
-
-def countdown(sec: int) -> None:
-    if sec <= 0:
-        return
-    logging.info("Waiting %d s before playback…", sec)
-    time.sleep(sec)
-
-
-def main() -> None:
-    logging.info("Digital Signage Player starting (backend: %s)", PLAYER)
-    videos = collect_videos()
-    if not videos:
-        logging.error("No video files found in %s", VIDEO_DIR)
-        sys.exit(1)
-
-    countdown(LOGIN_WAIT_TIME)
-
-    cmd = [PLAYER, *PLAYER_OPTIONS, *videos]
-    logging.info("Exec: %s", " ".join(cmd))
-    subprocess.run(cmd, stdout=DEVNULL, stderr=DEVNULL, check=False)
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        logging.info("Interrupted by user")
+# VLC を実行（終了しない限りループ再生）
+try:
+    subprocess.run(VLC_COMMAND)
+except Exception as e:
+    print("❌ Playback error:", e)
+    sys.exit(1)
