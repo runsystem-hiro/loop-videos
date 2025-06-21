@@ -1,111 +1,106 @@
-# 🎞️ loop-videos
 
-Raspberry Pi（64bit / CLI 環境）で、指定ディレクトリ内の `.mp4` 動画を **フルスクリーンかつ音声付きで連続再生**する軽量スクリプトです。
+# 🎥 loop-videos — Raspberry Pi HDMI Digital Signage
 
-## ✅ 特徴
-
-- GUI不要（Raspberry Pi OS Lite対応）
-- HDMIに映像出力しつつ、音声は3.5mmジャックから出力
-- VLC（`cvlc`）を使って超軽量ループ再生
-- `systemd` または `.bashrc` などで自動起動可能
+Raspberry Pi 4B (8GB) 向けのシンプルで信頼性の高い動画サイネージシステムです。  
+電源を入れるだけで、HDMIモニタに `.mp4` 動画をフルスクリーン＆音声付きで順番にループ再生します。  
+SSHでの運用に最適化されており、GUIは不要です。
 
 ---
 
-## 📁 ディレクトリ構成
+## 🎯 構成
 
-```
-loop-videos/
-├── assets/              # 再生対象の動画ファイル (.mp4) を配置
-│   ├── video1.mp4
-│   └── video2.mp4
-├── loop_videos.py       # メインの再生スクリプト
-└── start_video.sh       # 起動用シェルスクリプト（省略可能）
+- Raspberry Pi OS Bookworm 64bit (CLI 専用)
+- mpv による軽量なフルHD動画再生
+- 3.5mm ジャックから音声出力
+- 起動時自動再生（`systemd` 管理）
+- GPIO シャットダウンボタン対応
+
+---
+
+## 📂 ディレクトリ構成
+
+```bash
+/home/pi/loop-videos/
+├── assets/             # 動画ファイル (.mp4) を格納するフォルダ
+└── play_videos.sh      # 再生ループスクリプト
 ```
 
 ---
 
-## 🔧 セットアップ手順（Raspberry Pi）
-
-### 1. 必要パッケージのインストール
+## 📦 依存パッケージ
 
 ```bash
 sudo apt update
-sudo apt install vlc -y
+sudo apt install -y mpv
 ```
 
-> `vlc` コマンドに含まれる `cvlc` を使用します。
-
----
-
-### 2. スクリプトの実行確認（手動）
+## 🚀 初回セットアップ手順
 
 ```bash
-chmod +x start_video.sh
-./start_video.sh
-```
+# 1) コード配置
+mkdir -p /home/pi/loop-videos && cd /home/pi/loop-videos
+git clone <repo> .
 
-または直接：
+# 2) systemd サービス登録
+sudo cp loop-videos.service /etc/systemd/system/
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
 
-```bash
-python3 loop_videos.py
-```
-
----
-
-### 3. 自動起動させたい場合（例：.bashrc）
-
-```bash
-nano ~/.bashrc
-```
-
-末尾に以下を追記：
-
-```bash
-/home/pi/loop-videos/start_video.sh &
-```
-
-> HDMIディスプレイが接続されており、かつ**自動ログイン**が有効な場合に動作します。
-
----
-
-## 🔁 動作仕様【loop_videos.py】
-
-- `/home/pi/loop-videos/assets/` 内の `.mp4` ファイルを昇順ソートして取得
-- `cvlc` に渡して全画面・静音・音声は `alsa`（3.5mmジャック）で出力
-- `--loop` オプションで動画を順に再生し、最後まで行ったら最初に戻る
-
-ソースハイライト：
-
-```python
-VLC_COMMAND = [
-    "cvlc",
-    "--fullscreen",
-    "--no-video-title-show",
-    "--video-on-top",
-    "--playlist-autostart",
-    "--loop",
-    "--quiet",
-    "--aout", "alsa"
-] + video_files
+# 3) 自動起動
+sudo systemctl enable loop-videos.service
+sudo systemctl start loop-videos.service
 ```
 
 ---
 
-## 📦 応用的な使い方（例）
+## 🛠️ config.txt の設定例
 
-- 縦長動画をあらかじめ FFMPEG で 1920x1080 化（ぼかし背景付き）
-- `systemd` を使ってサービスとして管理
-- 音声を HDMI 出力にしたい場合は `--aout alsa` を省略 or `--aout hdmi`
+```ini
+[all]
+hdmi_force_hotplug=1
+hdmi_group=1
+hdmi_mode=16
+config_hdmi_boost=7
+hdmi_drive=1
+audio=on
+gpu_mem=128
+
+# ==== physical shutdown button ====
+dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up
+```
 
 ---
 
-## 📜 ライセンス
+## 🔄 操作コマンド（SSHから）
 
-MIT License
-商用施設・展示・案内システムでの使用にも適します。
+| 動作        | コマンド |
+|-------------|----------|
+| 再生開始    | `sudo systemctl start loop-videos.service` |
+| 再生停止    | `sudo systemctl stop loop-videos.service`  |
+| ステータス確認 | `systemctl status loop-videos.service`      |
 
 ---
 
-## 👤 作者
+## 🧪 テスト
 
-[ヒロ | hirotech]
+1. `/home/pi/loop-videos/assets/` に `.mp4` を数本配置
+2. `sudo reboot` 後に自動再生されるか確認
+3. 音声が 3.5mm ジャックから出力されているか確認
+
+---
+
+## 🔌 シャットダウンボタン（GPIO17）
+
+- **物理ピン 11（GPIO17）と GND（例：ピン6）** をボタンで接続
+- 押すと `sudo shutdown -h now` が安全に実行されます
+
+---
+
+## 📝 ライセンス
+
+MIT License 商用施設・展示・案内システムでの使用にも適します
+
+---
+
+Powered by hiro
+

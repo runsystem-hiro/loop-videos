@@ -1,0 +1,15 @@
+[Unit]
+Description=Loop Video Signage on HDMI with 3.5mm audio
+After=network.target sound.target
+
+[Service]
+ExecStart=/home/pi/loop-videos/play_videos.sh
+WorkingDirectory=/home/pi/loop-videos
+Restart=always
+User=pi
+Environment=DISPLAY=:0
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
