@@ -7,35 +7,37 @@ GUI（X11/Wayland）は使用せず、**DRM/KMS 直出し（tty1 専有）**で�
 
 ---
 
-## 1. 目的と設計方針
+## 1. ゴール / 設計方針
 
-### 目的
+### ゴール
 
-- 展示会での動画再生（長時間運用）
-- 再起動後も自動で再生
+- 展示会での動画再生（長時間連続運用）
+- 再起動後も自動再生
 - 音声（3.5mm）を確実に出す
-- できるだけトラブル要因（GUI/VNC/セッション依存）を排除
+- 現場で「迷いなく復旧できる」
 
 ### 設計方針（重要）
 
-- **Bookworm Lite 64-bit**（CLI 運用）を前提
+- **Bookworm Lite 64-bit（CLI 運用）** を前提（GUI は使わない）
 - 再生は `mpv` を **DRM/KMS 直出し**で実行（X11 不要）
-- `tty1` は **サイネージ専用**として確保（getty を無効化・mask）
+- `tty1` は **サイネージ専用**として確保（`getty@tty1` を無効化・mask）
 - 音声は **ALSA 直指定**で 3.5mm（Headphones）固定
-- `systemd` 常駐 + 自己復旧（mpv 終了時も再開）
-- ログは `logrotate` で肥大化を防止
+- `systemd` 常駐 + 自己復旧（`mpv` 終了時も自動再開）
+- ログ肥大化を防ぐ（`logrotate` + journald 上限推奨）
 
 ---
 
 ## 2. 仕様（要点）
 
 - 再生対象: `/home/pi/loop-videos/videos/active/` 配下の `*.mp4`
-- 再生順: **ファイル名の昇順**
+- 再生順: **ファイル名昇順**
 - ループ: 無限ループ
 - 運用: 日程に応じて `active/` ⇔ `backup/` に移動して切替（結合不要）
 - 出力: HDMI 全画面
-- 音声: 3.5mm（アナログ）
-- 操作: SSH のみで運用可能
+- 音声: **3.5mm（アナログ）**
+- 操作: SSH のみで運用可能（キーボード/マウス不要）
+
+> 「ロゴを常時背面に表示」は DRM 直出しでは壁紙が使えないため、必要なら **動画へロゴ焼き込み**が最も安定します。
 
 ---
 
@@ -66,7 +68,7 @@ GUI（X11/Wayland）は使用せず、**DRM/KMS 直出し（tty1 専有）**で�
 
 ---
 
-## 5. セットアップ手順（最短）
+## 5. セットアップ（手順）
 
 ### 5.1 パッケージ導入
 
@@ -79,7 +81,7 @@ sudo reboot
 
 ### 5.2 HDMI を 1080p/60 に固定（推奨）
 
-`/boot/firmware/config.txt` 末尾に追記:
+`/boot/firmware/config.txt` 末尾に追記（例）:
 
 ```txt
 hdmi_force_hotplug=1
@@ -88,13 +90,10 @@ hdmi_mode=16
 hdmi_drive=1
 dtparam=audio=on
 gpu_mem=256
-
-# ==== physical shutdown button ====
-dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up
 ```
 
 - `hdmi_drive=1` は DVI モード（HDMI 音声無効）  
-  → 今回は 3.5mm 音声固定のため、競合を減らして安定します。
+  → 本構成は **3.5mm 音声固定**のため、競合を減らして安定します。
 
 ```bash
 sudo reboot
@@ -125,8 +124,6 @@ mkdir -p /home/pi/loop-videos/{videos/active,videos/backup,scripts,logs}
 - `scripts/build_playlist.sh`（active から `playlist.m3u` を生成）
 - `scripts/run_player_drm.sh`（DRM/KMS で再生。自己復旧ループ、音声デバイス待ちを含む）
 
-> スクリプトの中身は本リポジトリの `scripts/` を参照してください。
-
 権限付与:
 
 ```bash
@@ -135,9 +132,24 @@ chmod +x /home/pi/loop-videos/scripts/*.sh
 
 ---
 
-## 6. systemd サービス（最重要：tty1 専有）
+## 6. GPIO（オプション：物理シャットダウンボタン）
 
-### 6.1 `tty1` をサイネージ専用にする（getty 停止）
+展示会で「物理ボタンで安全にシャットダウン」したい場合は `gpio-shutdown` を使います。  
+（例: GPIO17 / active_low / pull-up）
+
+`/boot/firmware/config.txt` に追記:
+
+```txt
+dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up
+```
+
+> GPIO 番号は **BCM 番号**です（GPIO17 = 物理ピン 11）。
+
+---
+
+## 7. systemd サービス（最重要：tty1 専有）
+
+### 7.1 tty1 をサイネージ専用にする（getty 停止）
 
 ログイン画面（getty）が tty1 を握ると、DRM/KMS 再生が不安定になることがあります。  
 展示会運用では tty1 を **サイネージ専用**として確保するのが最も堅牢です。
@@ -148,14 +160,39 @@ sudo systemctl disable getty@tty1.service
 sudo systemctl mask getty@tty1.service
 ```
 
-### 6.2 service 設定
+### 7.2 `loop-videos.service` を作成（完全版）
 
-`/etc/systemd/system/loop-videos.service` を配置します。  
-ポイント:
+以下を **そのまま** `/etc/systemd/system/loop-videos.service` として保存してください。
 
-- `TTYPath=/dev/tty1` で tty1 を掴む
-- `Restart=always` で常駐運用
-- `ExecStart=/home/pi/loop-videos/scripts/run_player_drm.sh`
+```ini
+[Unit]
+Description=Exhibition Signage Player (DRM/KMS mpv on tty1 - dedicated)
+After=multi-user.target sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/loop-videos
+
+# tty1 を専有して DRM/KMS を安定させる（getty@tty1 を mask 済みが前提）
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+
+ExecStart=/home/pi/loop-videos/scripts/run_player_drm.sh
+
+# 展示会用：落ちたら必ず復帰（スクリプト側も自己復旧ループ）
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+```
 
 反映:
 
@@ -165,17 +202,10 @@ sudo systemctl enable --now loop-videos.service
 sudo systemctl status loop-videos.service --no-pager
 ```
 
-### 6.3 起動ターゲットを CLI へ（推奨）
+### 7.3 起動ターゲットを CLI へ（推奨）
 
 ```bash
 sudo systemctl set-default multi-user.target
-sudo reboot
-```
-
-GUI へ戻す:
-
-```bash
-sudo systemctl set-default graphical.target
 sudo reboot
 ```
 
@@ -183,30 +213,56 @@ sudo reboot
 
 ---
 
-## 7. logrotate（ログ肥大化対策）
+## 8. logrotate（ログ肥大化対策）
 
-`/etc/logrotate.d/loop-videos-mpv` を作成します。  
-ポイント:
+### 8.1 mpv ログ
 
-- `copytruncate` により mpv がログを掴んだままでも安全にローテート
+以下を **そのまま** `/etc/logrotate.d/loop-videos-mpv` として保存してください。
 
-適用・確認:
+```conf
+/home/pi/loop-videos/logs/mpv_drm.log {
+    daily
+    rotate 14
+    size 20M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0644 pi pi
+}
+```
+
+確認:
 
 ```bash
 sudo logrotate -d /etc/logrotate.d/loop-videos-mpv
 sudo logrotate -f /etc/logrotate.d/loop-videos-mpv
+ls -la /home/pi/loop-videos/logs/
 ```
 
-（推奨）journald 上限設定:
+### 8.2 （推奨）journald の上限設定
 
-- `SystemMaxUse=100M`
-- `MaxRetentionSec=7day`
+`/etc/systemd/journald.conf` に例として:
+
+```conf
+SystemMaxUse=100M
+SystemMaxFileSize=20M
+MaxRetentionSec=7day
+```
+
+反映:
+
+```bash
+sudo systemctl restart systemd-journald
+journalctl --disk-usage
+```
 
 ---
 
-## 8. 運用
+## 9. 運用
 
-### 8.1 動画の投入 / 切替
+### 9.1 動画の投入 / 切替
 
 - 再生: `videos/active/` に置く
 - 一時停止: `videos/backup/` に移す
@@ -217,45 +273,46 @@ sudo logrotate -f /etc/logrotate.d/loop-videos-mpv
 sudo systemctl restart loop-videos.service
 ```
 
-### 8.2 コマンド
+### 9.2 現場復旧（最短コマンド）
 
 ```bash
-sudo systemctl start loop-videos.service
-sudo systemctl stop loop-videos.service
 sudo systemctl restart loop-videos.service
 sudo systemctl status loop-videos.service --no-pager
+journalctl -u loop-videos.service -n 120 --no-pager
+tail -n 120 /home/pi/loop-videos/logs/mpv_drm.log
 ```
 
-### 8.3 ログ確認
+### 9.3 動画転送（例）
 
-```bash
-journalctl -u loop-videos.service -n 200 --no-pager
-tail -n 200 /home/pi/loop-videos/logs/mpv_drm.log
+Windows PowerShell:
+
+```powershell
+scp .\*.mp4 pi@<raspi-ip>:/home/pi/loop-videos/videos/active/
 ```
 
 ---
 
-## 9. トラブルシュート（要点）
+## 10. トラブルシュート（最小限）
 
 ### 再起動後に login 画面になる
 
-- `getty@tty1` が生きている可能性があります。
+- `getty@tty1` が mask されていない可能性があります。
 
 ```bash
 systemctl status getty@tty1.service --no-pager
 ```
 
-- 必要なら **mask** を再適用（上記 6.1）。
+- `masked` になっていなければ 7.1 を再実行。
 
 ### 音が出ない（起動直後）
 
-- `Headphones` が認識されているか確認:
+- `Headphones` が認識されているか:
 
 ```bash
 aplay -l
 ```
 
-- 音声デバイス名が異なる場合は `run_player_drm.sh` の `--audio-device=` を修正。
+- デバイス名が異なる場合は `run_player_drm.sh` の `--audio-device=` を修正。
 
 ### DRM 権限エラー
 
@@ -266,7 +323,7 @@ ls -la /dev/dri
 
 ---
 
-## 10. 復旧（元に戻す方法）
+## 11. 復旧（元に戻す）
 
 ### tty1 のログイン画面を復活させる
 
@@ -277,9 +334,9 @@ sudo systemctl enable --now getty@tty1.service
 
 ---
 
-## 11. 運用上の推奨
+## 12. 運用上の推奨
 
-- 本番中は `apt upgrade` を避ける（挙動差を回避）
+- 本番中は `sudo apt upgrade` を実行しない（挙動差を避ける）
 - 予備 microSD（複製）を準備すると現場復旧が高速
 - 長期運用なら高耐久 microSD / SSD boot 推奨
 
@@ -288,7 +345,3 @@ sudo systemctl enable --now getty@tty1.service
 ## License
 
 社内運用想定。必要に応じて `LICENSE` を追加してください（例: MIT）。
-
----
-
-Powered by hiro
