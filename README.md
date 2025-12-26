@@ -88,6 +88,9 @@ hdmi_mode=16
 hdmi_drive=1
 dtparam=audio=on
 gpu_mem=256
+
+# ==== physical shutdown button ====
+dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up
 ```
 
 - `hdmi_drive=1` は DVI モード（HDMI 音声無効）  
