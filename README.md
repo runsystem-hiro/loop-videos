@@ -37,8 +37,6 @@ GUI（X11/Wayland）は使用せず、**DRM/KMS 直出し（tty1 専有）**で�
 - 音声: **3.5mm（アナログ）**
 - 操作: SSH のみで運用可能（キーボード/マウス不要）
 
-> 「ロゴを常時背面に表示」は DRM 直出しでは壁紙が使えないため、必要なら **動画へロゴ焼き込み**が最も安定します。
-
 ---
 
 ## 3. 動作環境
@@ -265,7 +263,7 @@ journalctl --disk-usage
 ### 9.1 動画の投入 / 切替
 
 - 再生: `videos/active/` に置く
-- 一時停止: `videos/backup/` に移す
+- 非再生: `videos/backup/` に移す
 
 反映:
 
@@ -344,4 +342,6 @@ sudo systemctl enable --now getty@tty1.service
 
 ## License
 
-社内運用想定。必要に応じて `LICENSE` を追加してください（例: MIT）。
+社内運用想定
+
+© hiro MIT License
