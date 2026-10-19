@@ -73,40 +73,14 @@ GUI（X11/Wayland）は使用せず、**DRM/KMS 直出し（tty1 専有）**で�
 
 ### 5.1 パッケージ導入
 
-Bookworm と Trixie のどちらでも同じ手順です。Trixie は Debian 13 系で、
-`mpv` 0.40 系を含みます。本構成は PipeWire/PulseAudio を経由せず、mpv から
-ALSA のオンボード Headphones デバイスへ直接出力するため、Lite 環境でも GUI は不要です。
-
 ```bash
 sudo apt update
 sudo apt -y full-upgrade
-sudo apt -y install mpv ffmpeg jq rsync
+sudo apt -y install mpv
 sudo reboot
 ```
 
-### 5.2 HDMI を 1080p/60 に固定（推奨）
-
-`/boot/firmware/config.txt` 末尾に追記（例）:
-
-```txt
-hdmi_force_hotplug=1
-hdmi_group=1
-hdmi_mode=16
-hdmi_drive=1
-dtparam=audio=on
-gpu_mem=256
-```
-
-- `hdmi_drive=1` は DVI モード（HDMI 音声無効）
-  → 本構成は **3.5mm 音声固定**のため、競合を減らして安定します。
-- Trixie では `auto_initramfs` が標準で有効です。既存の設定を削除・置換せず、
-  上記の必要な行だけを追記してください。
-
-```bash
-sudo reboot
-```
-
-### 5.3 DRM/KMS 権限（video グループ）
+### 5.2 DRM/KMS 権限（video グループ）
 
 ```bash
 sudo usermod -aG video pi
@@ -138,13 +112,13 @@ TrixieではH.264/HEVC用の `v4l2m2m` が表示されることも確認しま�
 mpv --hwdec=help | grep -F v4l2m2m
 ```
 
-### 5.4 ディレクトリ作成
+### 5.3 ディレクトリ作成
 
 ```bash
 mkdir -p /home/pi/loop-videos/{videos/active,videos/backup,scripts,logs}
 ```
 
-### 5.5 スクリプト配置
+### 5.4 スクリプト配置
 
 - `scripts/build_playlist.sh`（active から `playlist.m3u` を生成）
 - `scripts/run_player_drm.sh`（DRM/KMS で再生。自己復旧ループ、音声デバイス待ちを含む）
