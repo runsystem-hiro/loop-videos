@@ -24,6 +24,7 @@ GUI（X11/Wayland）は使用せず、**DRM/KMS 直出し（tty1 専有）**で�
 - 再生は `mpv` を **DRM/KMS 直出し**で実行（X11 不要）
 - `tty1` は **サイネージ専用**として確保（`getty@tty1` を無効化・mask）
 - 音声は **ALSA 直指定**で 3.5mm（Headphones）固定
+- H.264/HEVC は **V4L2 M2M ハードウェアデコード**を使用（Pi 4Bの1080p再生を安定化）
 - `systemd` 常駐 + 自己復旧（`mpv` 終了時も自動再開）
 - ログ肥大化を防ぐ（`logrotate` + journald 上限推奨）
 
@@ -131,6 +132,12 @@ mpv --version
 カード名が異なる場合は、後述の「音が出ない」の手順で service の `AUDIO_DEVICE` と
 `ALSA_CARD_NAME` を実機の値へ変更してください。
 
+TrixieではH.264/HEVC用の `v4l2m2m` が表示されることも確認します。
+
+```bash
+mpv --hwdec=help | grep -F v4l2m2m
+```
+
 ### 5.4 ディレクトリ作成
 
 ```bash
@@ -207,6 +214,8 @@ ExecStart=/home/pi/loop-videos/scripts/run_player_drm.sh
 # 任意: aplay -l で Headphones 以外のカード名だった場合だけ指定する
 # Environment="ALSA_CARD_NAME=Headphones"
 # Environment="AUDIO_DEVICE=alsa/plughw:CARD=Headphones,DEV=0"
+# 任意: 動画互換性の調査時のみソフトウェアデコードへ切り替える
+# Environment="MPV_HWDEC=no"
 
 # 展示会用：落ちたら必ず復帰（スクリプト側も自己復旧ループ）
 Restart=always
@@ -367,6 +376,23 @@ journalctl -b -u loop-videos.service --no-pager -n 120
 
 - `getty@tty1.service` は `masked` が正常です。
 - サービスログに `mpv start` があり、画面・3.5mm 音声が再生されれば受入完了です。
+
+### 映像がカクつく
+
+Pi 4Bで1080p動画をソフトウェアデコードするとCPU使用率が飽和し、カクつく場合があります。
+本スクリプトは既定で `--hwdec=v4l2m2m-copy` を使用します。ログで実際にハードウェア
+デコードが有効になったことを確認してください。
+
+```bash
+tail -n 200 /home/pi/loop-videos/logs/mpv_drm.log | grep -E 'hwdec=|Using hardware decoding'
+```
+
+原因切り分けのため一時的にソフトウェアデコードへ戻す場合だけ、serviceに次を追加して
+再起動します。
+
+```ini
+Environment="MPV_HWDEC=no"
+```
 
 ### DRM 権限エラー
 

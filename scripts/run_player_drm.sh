@@ -9,6 +9,9 @@ LOG_FILE="$BASE_DIR/logs/mpv_drm.log"
 AUDIO_DEVICE="${AUDIO_DEVICE:-alsa/plughw:CARD=Headphones,DEV=0}"
 ALSA_CARD_NAME="${ALSA_CARD_NAME:-Headphones}"
 ALSA_WAIT_SECONDS="${ALSA_WAIT_SECONDS:-30}"
+# Raspberry Pi 4B / Trixie の H.264・HEVC は V4L2 M2M でデコードする。
+# 動画互換性の調査時だけ MPV_HWDEC=no でソフトウェアデコードへ戻せる。
+MPV_HWDEC="${MPV_HWDEC:-v4l2m2m-copy}"
 
 mkdir -p "$BASE_DIR/logs"
 
@@ -35,7 +38,7 @@ while true; do
     continue
   fi
 
-  echo "=== $(date) mpv start ===" | tee -a "$LOG_FILE"
+  echo "=== $(date) mpv start (hwdec=${MPV_HWDEC}) ===" | tee -a "$LOG_FILE"
 
   # mpv の終了コードを明示的に受ける。set -e のままでは異常終了時に
   # この自己復旧ループも終了してしまうため、systemd 依存だけにしない。
@@ -43,7 +46,7 @@ while true; do
   mpv --playlist="$PLAYLIST" \
     --vo=gpu \
     --gpu-context=drm \
-    --hwdec=no \
+    --hwdec="$MPV_HWDEC" \
     --fullscreen \
     --no-border \
     --keep-open=no \
