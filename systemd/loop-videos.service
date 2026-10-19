@@ -1,0 +1,24 @@
+[Unit]
+Description=Exhibition Signage Player (DRM/KMS mpv on tty1)
+After=multi-user.target sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/loop-videos
+
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+
+ExecStart=/home/pi/loop-videos/scripts/run_player_drm.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
