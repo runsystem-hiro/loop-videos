@@ -383,6 +383,9 @@ Pi 4Bで1080p動画をソフトウェアデコードするとCPU使用率が飽�
 本スクリプトは既定で `--hwdec=v4l2m2m-copy` を使用します。ログで実際にハードウェア
 デコードが有効になったことを確認してください。
 
+描画は `--profile=fast`、同期は `--video-sync=audio` を使用します。
+展示用の固定フレームレート動画に対して負荷の大きい `display-resample` は使用しません。
+
 ```bash
 tail -n 200 /home/pi/loop-videos/logs/mpv_drm.log | grep -E 'hwdec=|Using hardware decoding'
 ```

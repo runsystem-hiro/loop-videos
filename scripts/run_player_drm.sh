@@ -47,6 +47,7 @@ while true; do
     --vo=gpu \
     --gpu-context=drm \
     --hwdec="$MPV_HWDEC" \
+    --profile=fast \
     --fullscreen \
     --no-border \
     --keep-open=no \
@@ -54,7 +55,7 @@ while true; do
     --prefetch-playlist=yes \
     --cache=yes \
     --demuxer-readahead-secs=5 \
-    --video-sync=display-resample \
+    --video-sync=audio \
     --framedrop=vo \
     --vd-lavc-threads=2 \
     --audio-device="$AUDIO_DEVICE" \
