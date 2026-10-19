@@ -1,8 +1,10 @@
 # 🎥 loop-videos — Raspberry Pi HDMI Digital Signage
 
-**Raspberry Pi OS Bookworm Lite (64-bit) / DRM-KMS / mpv / 3.5mm Audio / systemd**
+## 対応環境
 
-展示会向けに、Raspberry Pi 4B 上で **指定ディレクトリ内の MP4 を HDMI に全画面でループ再生**し、音声を **3.5mm（アナログ）** から出力するサイネージプレイヤーです。  
+Raspberry Pi OS Bookworm / Trixie Lite (64-bit) / DRM-KMS / mpv / 3.5mm Audio / systemd
+
+展示会向けに、Raspberry Pi 4B 上で **指定ディレクトリ内の MP4 を HDMI に全画面でループ再生**し、音声を **3.5mm（アナログ）** から出力するサイネージプレイヤーです。
 GUI（X11/Wayland）は使用せず、**DRM/KMS 直出し（tty1 専有）**で安定運用します。
 
 ---
@@ -18,10 +20,11 @@ GUI（X11/Wayland）は使用せず、**DRM/KMS 直出し（tty1 専有）**で�
 
 ### 設計方針（重要）
 
-- **Bookworm Lite 64-bit（CLI 運用）** を前提（GUI は使わない）
+- **Bookworm Lite または Trixie Lite 64-bit（CLI 運用）** を前提（GUI は使わない）
 - 再生は `mpv` を **DRM/KMS 直出し**で実行（X11 不要）
 - `tty1` は **サイネージ専用**として確保（`getty@tty1` を無効化・mask）
 - 音声は **ALSA 直指定**で 3.5mm（Headphones）固定
+- H.264/HEVC は **V4L2 M2M ハードウェアデコード**を使用（Pi 4Bの1080p再生を安定化）
 - `systemd` 常駐 + 自己復旧（`mpv` 終了時も自動再開）
 - ログ肥大化を防ぐ（`logrotate` + journald 上限推奨）
 
@@ -42,7 +45,7 @@ GUI（X11/Wayland）は使用せず、**DRM/KMS 直出し（tty1 専有）**で�
 ## 3. 動作環境
 
 - Raspberry Pi 4B（8GB 推奨）
-- Raspberry Pi OS Bookworm Lite (64-bit)
+- Raspberry Pi OS Bookworm Lite (64-bit) または Trixie Lite (64-bit)
 - 動画: 1920×1080 / 30fps / MP4（H.264/AAC 想定）
 - HDMI: 1080p/60 固定推奨
 - 音声: 3.5mm（アナログ）
@@ -73,31 +76,11 @@ GUI（X11/Wayland）は使用せず、**DRM/KMS 直出し（tty1 専有）**で�
 ```bash
 sudo apt update
 sudo apt -y full-upgrade
-sudo apt -y install mpv ffmpeg jq rsync
+sudo apt -y install mpv
 sudo reboot
 ```
 
-### 5.2 HDMI を 1080p/60 に固定（推奨）
-
-`/boot/firmware/config.txt` 末尾に追記（例）:
-
-```txt
-hdmi_force_hotplug=1
-hdmi_group=1
-hdmi_mode=16
-hdmi_drive=1
-dtparam=audio=on
-gpu_mem=256
-```
-
-- `hdmi_drive=1` は DVI モード（HDMI 音声無効）  
-  → 本構成は **3.5mm 音声固定**のため、競合を減らして安定します。
-
-```bash
-sudo reboot
-```
-
-### 5.3 DRM/KMS 権限（video グループ）
+### 5.2 DRM/KMS 権限（video グループ）
 
 ```bash
 sudo usermod -aG video pi
@@ -111,13 +94,31 @@ groups pi
 ls -la /dev/dri
 ```
 
-### 5.4 ディレクトリ作成
+Trixie で初回起動後に、DRM/KMS とオンボード音声を必ず確認します。
+
+```bash
+test -c /dev/dri/card0 && echo 'OK: DRM card0'
+aplay -l
+mpv --version
+```
+
+正常時は `/dev/dri/card0` が存在し、`aplay -l` に `Headphones` を含むカードが表示されます。
+カード名が異なる場合は、後述の「音が出ない」の手順で service の `AUDIO_DEVICE` と
+`ALSA_CARD_NAME` を実機の値へ変更してください。
+
+TrixieではH.264/HEVC用の `v4l2m2m` が表示されることも確認します。
+
+```bash
+mpv --hwdec=help | grep -F v4l2m2m
+```
+
+### 5.3 ディレクトリ作成
 
 ```bash
 mkdir -p /home/pi/loop-videos/{videos/active,videos/backup,scripts,logs}
 ```
 
-### 5.5 スクリプト配置
+### 5.4 スクリプト配置
 
 - `scripts/build_playlist.sh`（active から `playlist.m3u` を生成）
 - `scripts/run_player_drm.sh`（DRM/KMS で再生。自己復旧ループ、音声デバイス待ちを含む）
@@ -132,7 +133,7 @@ chmod +x /home/pi/loop-videos/scripts/*.sh
 
 ## 6. GPIO（オプション：物理シャットダウンボタン）
 
-展示会で「物理ボタンで安全にシャットダウン」したい場合は `gpio-shutdown` を使います。  
+展示会で「物理ボタンで安全にシャットダウン」したい場合は `gpio-shutdown` を使います。
 （例: GPIO17 / active_low / pull-up）
 
 `/boot/firmware/config.txt` に追記:
@@ -149,7 +150,7 @@ dtoverlay=gpio-shutdown,gpio_pin=17,active_low=1,gpio_pull=up
 
 ### 7.1 tty1 をサイネージ専用にする（getty 停止）
 
-ログイン画面（getty）が tty1 を握ると、DRM/KMS 再生が不安定になることがあります。  
+ログイン画面（getty）が tty1 を握ると、DRM/KMS 再生が不安定になることがあります。
 展示会運用では tty1 を **サイネージ専用**として確保するのが最も堅牢です。
 
 ```bash
@@ -183,6 +184,12 @@ StandardOutput=journal
 StandardError=journal
 
 ExecStart=/home/pi/loop-videos/scripts/run_player_drm.sh
+
+# 任意: aplay -l で Headphones 以外のカード名だった場合だけ指定する
+# Environment="ALSA_CARD_NAME=Headphones"
+# Environment="AUDIO_DEVICE=alsa/plughw:CARD=Headphones,DEV=0"
+# 任意: 動画互換性の調査時のみソフトウェアデコードへ切り替える
+# Environment="MPV_HWDEC=no"
 
 # 展示会用：落ちたら必ず復帰（スクリプト側も自己復旧ループ）
 Restart=always
@@ -311,6 +318,58 @@ aplay -l
 ```
 
 - デバイス名が異なる場合は `run_player_drm.sh` の `--audio-device=` を修正。
+- **Trixie を含め、スクリプト本体を直接編集する必要はありません。**
+  `aplay -l` に表示された実際のカード名へ、`loop-videos.service` の
+  `Environment` 2行を設定してから反映します（例は USB 音声ではなくオンボード名が
+  異なる場合）。
+
+```ini
+Environment="ALSA_CARD_NAME=<aplay -l に表示されたカード名>"
+Environment="AUDIO_DEVICE=alsa/plughw:CARD=<同じカード名>,DEV=0"
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart loop-videos.service
+journalctl -u loop-videos.service -n 120 --no-pager
+```
+
+### Trixie Lite 初回導入時の確認
+
+以下は、Trixie Lite 64-bit の初回導入後に実行する受入確認です。すべて `OK` または
+`active (running)` になれば、Bookworm と同じ運用手順へ移行できます。
+
+```bash
+cat /etc/os-release
+test -c /dev/dri/card0 && echo 'OK: DRM/KMS'
+aplay -l | grep -F Headphones && echo 'OK: analog audio'
+systemctl is-enabled getty@tty1.service
+systemctl is-active loop-videos.service
+journalctl -b -u loop-videos.service --no-pager -n 120
+```
+
+- `getty@tty1.service` は `masked` が正常です。
+- サービスログに `mpv start` があり、画面・3.5mm 音声が再生されれば受入完了です。
+
+### 映像がカクつく
+
+Pi 4Bで1080p動画をソフトウェアデコードするとCPU使用率が飽和し、カクつく場合があります。
+本スクリプトは既定で `--hwdec=v4l2m2m-copy` を使用します。ログで実際にハードウェア
+デコードが有効になったことを確認してください。
+
+描画は `--profile=fast`、同期は `--video-sync=audio` を使用します。
+展示用の固定フレームレート動画に対して負荷の大きい `display-resample` は使用しません。
+
+```bash
+tail -n 200 /home/pi/loop-videos/logs/mpv_drm.log | grep -E 'hwdec=|Using hardware decoding'
+```
+
+原因切り分けのため一時的にソフトウェアデコードへ戻す場合だけ、serviceに次を追加して
+再起動します。
+
+```ini
+Environment="MPV_HWDEC=no"
+```
 
 ### DRM 権限エラー
 
