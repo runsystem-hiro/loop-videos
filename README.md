@@ -27,6 +27,19 @@ sudo ./scripts/install.sh
 
 `install.sh`は、必要パッケージ導入、ディレクトリ作成、DRM/KMS・3.5mm音声・V4L2の検証、tty1専有、systemd登録と起動を行います。要件を満たさない場合はエラー終了します。
 
+## サイネージ専用の最小化
+
+Bluetoothを使用しない場合は停止・maskします。Wi-Fi接続とSSHは維持されます。
+
+```bash
+sudo systemctl disable --now bluetooth.service
+sudo systemctl mask bluetooth.service
+sudo systemctl disable NetworkManager-wait-online.service
+```
+
+`NetworkManager.service`、`wpa_supplicant.service`、`ssh.service`は停止しないでください。
+`expo-video.local`のようなmDNS名で接続する場合は、`avahi-daemon.service`も維持します。
+
 ## 動画の配置
 
 Windows PowerShellからMP4を転送します。サービスは動画を検知すると自動で再生します。
