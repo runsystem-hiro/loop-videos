@@ -89,3 +89,7 @@ sudo systemctl enable --now getty@tty1.service
   scripts/         # 再生・導入スクリプト
   logs/            # mpvログ
 ```
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
