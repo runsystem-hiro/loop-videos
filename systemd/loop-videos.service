@@ -7,6 +7,7 @@ Wants=sound.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/loop-videos
+EnvironmentFile=-/etc/default/loop-videos
 
 TTYPath=/dev/tty1
 TTYReset=yes
