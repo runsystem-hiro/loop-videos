@@ -69,6 +69,25 @@ mpv start (hwdec=v4l2m2m-copy)
 Using hardware decoding (v4l2m2m-copy)
 ```
 
+## 縦置きモニターでの回転再生
+
+動画を時計回り90度に回転して再生するには、SSH接続後に設定値を変更してサービスを再起動します。`/etc/default/loop-videos`は導入時に一度だけ作成され、リポジトリ更新時にも既存の値を保持します。
+
+```bash
+# 現在値を確認
+sudo grep -E '^MPV_VIDEO_ROTATE=' /etc/default/loop-videos
+
+# 時計回り90度へ変更し、即時反映
+sudo sed -i -E 's/^MPV_VIDEO_ROTATE=.*/MPV_VIDEO_ROTATE=90/' /etc/default/loop-videos
+sudo systemctl restart loop-videos.service
+
+# 正常確認（rotate=90 と active (running) を確認）
+sudo systemctl status loop-videos.service --no-pager
+tail -n 30 /home/pi/loop-videos/logs/mpv_drm.log
+```
+
+復帰時は同じ手順で`MPV_VIDEO_ROTATE=0`に戻してください。指定できる値は`0`、`90`、`180`、`270`です。
+
 ## 最短の切り分け
 
 ```bash
